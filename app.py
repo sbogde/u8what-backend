@@ -28,19 +28,13 @@ yolo_models = {
     "yolov8l-seg": YOLO('yolov8l-seg.pt'),
     "yolov8x-seg": YOLO('yolov8x-seg.pt'),
 
-    "myfoodrepo-best": YOLO("myfoodrepo-best.pt"),
-    "food-recognition-v0.4-best": YOLO("food-recognition-v0.4-best.pt"),
-    
-    "food-recognition-v2.1-yolo-v8-m-best": YOLO("food-recognition-v2.1-yolo-v8-m-best.pt"),
 
-    "food-recognition-v2.1-yv8l-75-768-73": YOLO("food-recognition-v2.1-yv8l-75-768-73.pt"),
-    "food-recognition-v2.1-yv8l-75-768-75-best": YOLO("food-recognition-v2.1-yv8l-75-768-75-best.pt"),
-    "hub-v0.4-272": YOLO("hub-v0.4-272.pt"),
-    "hub-v2.1-272": YOLO("hub-v2.1-272.pt"),
-    "runs864": YOLO("runs864.pt"),
-    "runs166": YOLO("runs166.pt"),
-    "best-v0.4-3-yv8m-100-640-55": YOLO("best-v0.4-3-yv8m-100-640-55.pt"),
-    "runs355-v0.4-3-yv8m-100-640": YOLO("runs355-v0.4-3-yv8m-100-640.pt"),
+    "v0.4-Ultralytics-Hub": YOLO("hub-v0.4-272.pt"),
+    "v2.1-Ultralytics-Hub": YOLO("hub-v2.1-272.pt"),
+
+    "v0.4-Google-Colab": YOLO("runs355-v0.4-3-yv8m-100-640.pt"),
+    "v2.1-Google-Colab": YOLO("runs166.pt"),
+
 }
 
 def store_prediction(filename_original, filename_server, model_name, prediction, confidence):
