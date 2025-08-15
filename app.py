@@ -33,8 +33,7 @@ yolo_models = {
     "v2.1-Ultralytics-Hub": YOLO("hub-v2.1-272.pt"),
 
     "v0.4-Google-Colab": YOLO("runs355-v0.4-3-yv8m-100-640.pt"),
-    "v2.1-Google-Colab": YOLO("runs166.pt"),
-
+    "v2.1-Google-Colab": YOLO("runs061-v2.1-4-yv8l-75-768.pt"),
 }
 
 def store_prediction(filename_original, filename_server, model_name, prediction, confidence):
