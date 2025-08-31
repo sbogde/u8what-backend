@@ -34,6 +34,9 @@ yolo_models = {
 
     "v0.4-Google-Colab": YOLO("runs355-v0.4-3-yv8m-100-640.pt"),
     "v2.1-Google-Colab": YOLO("runs061-v2.1-4-yv8l-75-768.pt"),
+
+    "v0.4-Mici-Google-Colab": YOLO("mici-v0.4-yv8m-100-640.pt"),
+
 }
 
 def store_prediction(filename_original, filename_server, model_name, prediction, confidence):
