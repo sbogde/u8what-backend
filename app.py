@@ -249,7 +249,8 @@ def logs():
     for r in rows:
         items.append({
             "id": r["id"],
-            "image": r["resized_image"] or f"segmented_{r['filename_server']}",
+            "image": r["resized_image"],
+            "filename_server": r["filename_server"],
             "model": r["model_name"],
             "prediction": r["top_label"],
             "confidence": r["top_confidence"],   # send raw; format as "71.33%" in UI
