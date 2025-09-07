@@ -36,7 +36,10 @@ yolo_models = {
     "v2.1-Google-Colab": YOLO("runs061-v2.1-4-yv8l-75-768.pt"),
 
     "v0.4-Mici-Google-Colab": YOLO("mici-v0.4-yv8m-100-640.pt"),
+    "v0.4_mici_plus3_stageB_epoch_02": YOLO("v0.4_mici_plus3_stageB_epoch_02.pt"),
+    "v0.4_mici_sarmale_mamaliga": YOLO("v0.4_mici_sarmale_mamaliga.pt"),
 
+    "v2.1_plus_yorkshire_pudding_gc": YOLO("v2.1_plus_yorkshire_pudding_gc.pt"),
 }
 
 def store_prediction(filename_original, filename_server, model_name, prediction, confidence):
