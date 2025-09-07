@@ -16,6 +16,9 @@ from tensorflow.keras.applications.imagenet_utils import decode_predictions, pre
 
 from ultralytics import YOLO
 
+# --- DB config ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH  = os.path.join(BASE_DIR, "u8what.db")
 
 app = Flask(__name__)
 CORS(app)
@@ -40,23 +43,26 @@ yolo_models = {
     "v0.4_mici_sarmale_mamaliga": YOLO("v0.4_mici_sarmale_mamaliga.pt"),
 
     "v2.1_plus_yorkshire_pudding_gc": YOLO("v2.1_plus_yorkshire_pudding_gc.pt"),
+    "v2.1_plus_yorkshire_pudding_uhub": YOLO("v2.1_plus_yorkshire_pudding_uhub.pt"),
 }
 
-def store_prediction(filename_original, filename_server, model_name, prediction, confidence):
-    conn = sqlite3.connect('predictions.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-    INSERT INTO predictions (filename_original, filename_server, model_name, prediction, confidence) VALUES (?, ?, ?, ?, ?)
-    ''', (filename_original, filename_server, model_name, prediction, confidence))
-    conn.commit()
-    conn.close()
+def _pct(x):
+    # normalise confidences into 0–100 (your model sometimes returns 0..1, sometimes 0..100)
+    return float(x) * 100.0 if 0.0 <= x <= 1.0 else float(x)
 
-def preprocess_image(img_path, target_size=(224, 224)):
-    img = load_img(img_path, target_size=target_size)
-    img = img_to_array(img)
-    img = np.expand_dims(img, axis=0)
-    img = preprocess_input(img)
-    return img
+def _labels_summary(results):
+    from collections import Counter
+    c = Counter(r["label"] for r in results)
+    import json
+    return json.dumps(c, ensure_ascii=False)
+
+
+# def preprocess_image(img_path, target_size=(224, 224)):
+#     img = load_img(img_path, target_size=target_size)
+#     img = img_to_array(img)
+#     img = np.expand_dims(img, axis=0)
+#     img = preprocess_input(img)
+#     return img
 
 
 def denormalize_image(img_array):
@@ -76,30 +82,45 @@ def save_image(img_array, save_path):
     img = Image.fromarray(img_array)
     img.save(save_path)
 
+
 def initialize_db():
-    if not os.path.exists('predictions.db'):
-        conn = sqlite3.connect('predictions.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-        CREATE TABLE predictions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename_original TEXT,
-            filename_server TEXT,
-            model_name TEXT,
-            prediction TEXT,
-            confidence REAL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        conn.commit()
-        conn.close()
-        print("Created 'predictions.db' database.")
+    schema = """
+    CREATE TABLE IF NOT EXISTS segmentations (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename_original TEXT,
+      filename_server   TEXT,
+      resized_image     TEXT,
+      model_name        TEXT NOT NULL,
+      num_detections    INTEGER NOT NULL DEFAULT 0,
+      top_label         TEXT,
+      top_confidence    REAL,
+      labels_json       TEXT,
+      created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS detections (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      segmentation_id  INTEGER NOT NULL REFERENCES segmentations(id) ON DELETE CASCADE,
+      label            TEXT NOT NULL,
+      confidence       REAL NOT NULL,
+      idx              INTEGER,
+      UNIQUE(segmentation_id, idx) ON CONFLICT IGNORE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_segmentations_created ON segmentations(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_segmentations_model   ON segmentations(model_name);
+    CREATE INDEX IF NOT EXISTS idx_detections_seg        ON detections(segmentation_id);
+    CREATE INDEX IF NOT EXISTS idx_detections_label      ON detections(label);
+    """
+    with get_db_connection() as conn:
+        conn.executescript(schema)
+    print("Created the database.")
 
 @app.route('/')
 def index():
     uploads_exists = os.path.exists('uploads')
     uploads_models_exists = os.path.exists('uploads/models')
-    db_exists = os.path.exists('predictions.db')
+    db_exists = os.path.exists(DB_PATH)
     return jsonify({
         "message": "Welcome to the Image Classification API!",
         "uploads_exists": uploads_exists,
@@ -114,9 +135,9 @@ def create_directories():
     return jsonify({"message": "Directories created."})
 
 @app.route('/mkdb', methods=['POST'])
-def create_database():
+def mkdb():
     initialize_db()
-    return jsonify({"message": "Database created."})
+    return jsonify({"ok": True, "db": os.path.basename(DB_PATH)})
 
 
 
@@ -151,6 +172,40 @@ def segment_food_image():
                 'confidence': float(conf) * 100
             })
 
+    # Compute summary
+    if results:
+        top = max(results, key=lambda r: _pct(r.get("confidence", 0)))
+        top_label = top.get("label")
+        top_conf  = _pct(top.get("confidence", 0))
+    else:
+        top_label = None
+        top_conf  = None
+
+    labels_json = _labels_summary(results)
+    num_detections = len(results)
+
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        # 1) insert parent row
+        cur.execute("""
+            INSERT INTO segmentations
+            (filename_original, filename_server, resized_image, model_name,
+            num_detections, top_label, top_confidence, labels_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (filename_original, filename_server, f"segmented_{filename_server}", model_name,
+            num_detections, top_label, top_conf, labels_json))
+        seg_id = cur.lastrowid
+
+        # 2) insert children
+        cur.executemany("""
+            INSERT INTO detections (segmentation_id, label, confidence, idx)
+            VALUES (?, ?, ?, ?)
+        """, [
+            (seg_id, r.get("label"), _pct(r.get("confidence", 0)), i)
+            for i, r in enumerate(results)
+        ])
+
+
     return jsonify({
         "model": model_name,
         "resized_image": f"segmented_{filename_server}",
@@ -160,24 +215,64 @@ def segment_food_image():
 # =============================
 # =============================ß
 
-
-
-
 def get_db_connection():
-    conn = sqlite3.connect('predictions.db')  # Adjust the database name as necessary
+    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = sqlite3.Row
+    # Hardening / performance:
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA busy_timeout = 5000;")  # ms
     return conn
 
-@app.route('/logs/<int:n1>/<int:n2>', defaults={'n2': 5})
-@app.route('/logs/<int:n1>', defaults={'n2': 5})
-def get_logs(n1, n2):
-    conn = get_db_connection()
-    query = 'SELECT * FROM predictions ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    logs = conn.execute(query, (n2, n1)).fetchall()
-    conn.close()
+@app.route('/logs', methods=['GET'])
+def logs():
+    # query params: ?page=1&page_size=20
+    try:
+        page      = max(int(request.args.get('page', 1)), 1)
+        page_size = min(max(int(request.args.get('page_size', 10)), 1), 100)
+    except ValueError:
+        page, page_size = 1, 10
+    offset = (page - 1) * page_size
 
-    logs_list = [dict(log) for log in logs]
-    return jsonify(logs_list)
+    with get_db_connection() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM segmentations").fetchone()[0]
+        rows  = conn.execute("""
+            SELECT id, filename_server, resized_image, model_name,
+                   top_label, top_confidence, num_detections, created_at
+            FROM segmentations
+            ORDER BY created_at DESC, id DESC
+            LIMIT ? OFFSET ?
+        """, (page_size, offset)).fetchall()
+
+    items = []
+    for r in rows:
+        items.append({
+            "id": r["id"],
+            "image": r["resized_image"] or f"segmented_{r['filename_server']}",
+            "model": r["model_name"],
+            "prediction": r["top_label"],
+            "confidence": r["top_confidence"],   # send raw; format as "71.33%" in UI
+            "num_detections": r["num_detections"],
+            "date": r["created_at"]
+        })
+
+    return jsonify({
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "items": items
+    })
+# @app.route('/logs/<int:n1>/<int:n2>', defaults={'n2': 5})
+# @app.route('/logs/<int:n1>', defaults={'n2': 5})
+# def get_logs(n1, n2):
+#     conn = get_db_connection()
+#     query = 'SELECT * FROM predictions ORDER BY created_at DESC LIMIT ? OFFSET ?'
+#     logs = conn.execute(query, (n2, n1)).fetchall()
+#     conn.close()
+
+#     logs_list = [dict(log) for log in logs]
+#     return jsonify(logs_list)
 
 
 @app.route('/uploads/<path:filename>')
