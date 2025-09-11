@@ -208,7 +208,8 @@ def segment_food_image():
 
     return jsonify({
         "model": model_name,
-        "resized_image": f"segmented_{filename_server}",
+        # "resized_image": f"segmented_{filename_server}",
+        "image": filename_server,
         "results": results
     })
 

@@ -4,3 +4,4 @@ predictions.db
 *.pt
 .DS_Store
 *.db-wal
+*.db-shm
