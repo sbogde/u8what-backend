@@ -225,6 +225,7 @@ def get_db_connection():
     conn.execute("PRAGMA busy_timeout = 5000;")  # ms
     return conn
 
+
 @app.route('/logs', methods=['GET'])
 def logs():
     # query params: ?page=1&page_size=20
@@ -249,8 +250,7 @@ def logs():
     for r in rows:
         items.append({
             "id": r["id"],
-            "image": r["resized_image"],
-            "filename_server": r["filename_server"],
+            "image": r["filename_server"],
             "model": r["model_name"],
             "prediction": r["top_label"],
             "confidence": r["top_confidence"],   # send raw; format as "71.33%" in UI
@@ -264,16 +264,7 @@ def logs():
         "total": total,
         "items": items
     })
-# @app.route('/logs/<int:n1>/<int:n2>', defaults={'n2': 5})
-# @app.route('/logs/<int:n1>', defaults={'n2': 5})
-# def get_logs(n1, n2):
-#     conn = get_db_connection()
-#     query = 'SELECT * FROM predictions ORDER BY created_at DESC LIMIT ? OFFSET ?'
-#     logs = conn.execute(query, (n2, n1)).fetchall()
-#     conn.close()
 
-#     logs_list = [dict(log) for log in logs]
-#     return jsonify(logs_list)
 
 
 @app.route('/uploads/<path:filename>')
