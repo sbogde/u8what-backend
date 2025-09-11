@@ -3,3 +3,4 @@ predictions.db
 **/__pycache__/
 *.pt
 .DS_Store
+*.db-wal
