@@ -20,8 +20,16 @@ from ultralytics import YOLO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.path.join(BASE_DIR, "u8what.db")
 
+ALLOWED_CORS_ORIGINS = [
+    "http://localhost",
+    "http://localhost:*",
+    "https://u8what.food",
+    "https://u8what.lol",
+    "https://u8what.netlify.app",
+]
+
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": ALLOWED_CORS_ORIGINS}})
 
 
 yolo_models = {
@@ -298,5 +306,4 @@ if __name__ == '__main__':
         # serve(app, host='0.0.0.0', port=5000)
     # else:
         # app.run(host="0.0.0.0", port=5000, debug=True)
-
 
