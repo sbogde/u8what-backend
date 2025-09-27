@@ -16,6 +16,11 @@ from tensorflow.keras.applications.imagenet_utils import decode_predictions, pre
 
 from ultralytics import YOLO
 
+try:
+    from nsfw_detector import predict as nsfw_predict
+except ImportError:  # keep optional dependency truly optional
+    nsfw_predict = None
+
 # --- DB config ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.path.join(BASE_DIR, "u8what.db")
@@ -30,6 +35,19 @@ ALLOWED_CORS_ORIGINS = [
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ALLOWED_CORS_ORIGINS}})
+
+
+NSFW_MODEL_PATH = os.environ.get("NSFW_MODEL_PATH")
+NSFW_THRESHOLD = float(os.environ.get("NSFW_THRESHOLD", "0.82"))
+NSFW_CLASSES = {"porn", "hentai", "sexy"}
+
+_nsfw_model = None
+if NSFW_MODEL_PATH and nsfw_predict is not None:
+    try:
+        _nsfw_model = nsfw_predict.load_model(NSFW_MODEL_PATH)
+        print(f"Loaded NSFW model from {NSFW_MODEL_PATH}.")
+    except Exception as exc:
+        print(f"[WARN] Failed to load NSFW model: {exc}")
 
 
 yolo_models = {
@@ -89,6 +107,18 @@ def save_image(img_array, save_path):
     img_array = np.uint8(img_array)
     img = Image.fromarray(img_array)
     img.save(save_path)
+
+
+def is_nsfw_image(filepath):
+    if _nsfw_model is None or nsfw_predict is None:
+        return False
+    try:
+        result = nsfw_predict.classify(_nsfw_model, filepath)
+    except Exception as exc:
+        print(f"[WARN] NSFW detection failed for {filepath}: {exc}")
+        return False
+    scores = result.get(filepath) or {}
+    return any(scores.get(label, 0.0) >= NSFW_THRESHOLD for label in NSFW_CLASSES)
 
 
 def initialize_db():
@@ -160,6 +190,13 @@ def segment_food_image():
     filename_server = f"{timestamp}_{filename_original}"
     filepath = os.path.join('uploads', filename_server)
     file.save(filepath)
+
+    if is_nsfw_image(filepath):
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
+        return jsonify({"error": "Upload rejected by safety filter."}), 422
 
     model_name = request.form.get('model', 'yolov8n-seg')
     model = yolo_models.get(model_name, yolo_models['yolov8n-seg'])
@@ -306,4 +343,3 @@ if __name__ == '__main__':
         # serve(app, host='0.0.0.0', port=5000)
     # else:
         # app.run(host="0.0.0.0", port=5000, debug=True)
-

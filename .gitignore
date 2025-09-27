@@ -6,3 +6,6 @@ predictions.db
 *.db-wal
 *.db-shm
 *.db
+whip-ma-whop-ma-pic.yml
+freeze-before-tf.txt.
+models/*.h5

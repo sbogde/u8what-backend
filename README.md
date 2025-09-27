@@ -16,6 +16,7 @@ https://u8what.food.
 - Exposes `/logs` for a paginated history of recent classifications.
 - Provides maintenance helpers (`/mkdirs`, `/mkdb`) to bootstrap storage and database.
 - Restricts CORS to trusted clients (`http://localhost` on any port, `https://u8what.food`, `https://u8what.lol`, `https://u8what.netlify.app`).
+- Optional NSFW guard using `nsfw-detector` when an NSFW model path is provided.
 
 ## Quick start (local)
 
@@ -25,13 +26,17 @@ python3 -m venv .venv && source .venv/bin/activate
 python -m pip install --upgrade pip
 
 # 2) Install dependencies
-pip install -r requirements.txt  # or install Flask, flask-cors, ultralytics, pillow, numpy, gunicorn
+pip install -r requirements.txt  # add nsfw-detector if you plan to enable the safety filter
 
 # 3) Ensure model weights are available (place *.pt files alongside app.py)
 # e.g. cp /path/to/yolov8n-seg.pt .
 
 # 4) Run the API
 python app.py  # or: flask --app app.py run
+
+# (optional) enable safety filter
+export NSFW_MODEL_PATH=/path/to/nsfw_mobilenet2.224x224.h5
+export NSFW_THRESHOLD=0.82  # tweak if needed
 ```
 
 When `FLASK_ENV=production` is set, the app ensures `uploads/` exists and creates the SQLite
